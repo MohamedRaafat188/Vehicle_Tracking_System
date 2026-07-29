@@ -5,9 +5,11 @@ This is a Vehicle Tracking System freelance project that uses computer vision to
 
 ## Demo
 
-<video src="assets/demo.mp4" controls width="640"></video>
+![Demo: vehicles detected and tracked, license plates read via OCR, including a motorcycle's two-line plate](assets/demo.gif)
 
-Generated with `visualize.py` on a real traffic clip: vehicles are detected and tracked, license plates are located per-vehicle and read via OCR, and both car plates (single-line) and motorcycle plates (split across two lines) are correctly assembled and displayed.
+Generated with `visualize.py` on a real traffic clip: vehicles are detected and tracked, license plates are located per-vehicle and read via OCR, and both car plates (single-line) and motorcycle plates (split across two lines, top-left in the clip above) are correctly assembled and displayed.
+
+Full-length version (24s, all vehicles in the clip): [assets/demo.mp4](assets/demo.mp4)
 
 ## Features
 - **Vehicle Detection:** Detects and identifies vehicles in each frame.
