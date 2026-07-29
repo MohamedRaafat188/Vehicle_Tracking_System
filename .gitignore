@@ -12,6 +12,7 @@ videos/
 # Generated results: detection crops, CSVs, reports, rendered videos
 output/
 *.mp4
+!assets/demo.mp4
 
 # Ultralytics / YOLO training and prediction runs
 runs/

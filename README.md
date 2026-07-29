@@ -3,6 +3,12 @@
 ## Overview
 This is a Vehicle Tracking System freelance project that uses computer vision to detect and track vehicles in real time. It leverages YOLOv8 model for detection and PaddleOCR for license plate recognition, along with data storage and visualization tools for tracking vehicle movement. These YOLO models will be deployed on the cloud and connected to the camera of the client using its url.
 
+## Demo
+
+<video src="assets/demo.mp4" controls width="640"></video>
+
+Generated with `visualize.py` on a real traffic clip: vehicles are detected and tracked, license plates are located per-vehicle and read via OCR, and both car plates (single-line) and motorcycle plates (split across two lines) are correctly assembled and displayed.
+
 ## Features
 - **Vehicle Detection:** Detects and identifies vehicles in each frame.
 - **License Plate Recognition:** Recognizes and extracts license plate numbers from detected vehicles.
