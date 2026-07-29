@@ -1,0 +1,46 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# Input videos (large, not source)
+videos/
+
+# Generated results: detection crops, CSVs, reports, rendered videos
+output/
+*.mp4
+
+# Ultralytics / YOLO training and prediction runs
+runs/
+
+# Roboflow dataset downloads
+License-Plate-Recognition-*/
+
+# Notebook checkpoints
+.ipynb_checkpoints/
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Deployment layer: TensorRT engines are hardware/version-specific and must be
+# built on the target device (see src/export/export_tensorrt.py); secrets
+# for RTSP camera credentials
+*.engine
+*.onnx
+.env
+
+# Deployment-layer local artifacts
+output/deployment/
+.simulate_cameras_pids/
+
+# Downloaded test tooling (mediamtx binary, fetched by developers as needed,
+# not project source) and its self-signed certs generated at runtime
+.tools/
+auto.crt
+auto.key

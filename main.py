@@ -2,19 +2,25 @@ from ultralytics import YOLO
 import cv2
 from threading import Thread
 from paddleocr import PaddleOCR
-from utils import save_cars
+from utils import save_cars, read_valid_license_plate
 
 
 # Initializing the models
-model_vehicles = YOLO("models/yolov8s")
+model_vehicles = YOLO("models/yolov8s.pt")
 model_lp = YOLO("models/best.pt")
 
 # Initialize ocr model
-ocr = PaddleOCR(lang='en', use_gpu=True)
+ocr = PaddleOCR(
+    lang="en",
+    ocr_version="PP-OCRv4",
+    use_doc_orientation_classify=False,
+    use_doc_unwarping=False,
+    use_textline_orientation=False)
 
 tracked_vehicles_ids = []
 results = []
 frames = 0
+thread = None
 
 video_path = input("Enter video path: ")
 cap = cv2.VideoCapture(video_path)
@@ -25,16 +31,12 @@ while True:
     ret, frame = cap.read()
 
     if not ret:
-        save_cars(results)
         break
-    
-    frames += 1
-    if frames % 2:
-        continue
 
+    frames += 1
     frame = cv2.resize(frame, (1920, 1080))
 
-    results_vehicles = model_vehicles.track(source=frame, conf=0.7, classes=[2, 3, 5, 7], persist=True)[0]
+    results_vehicles = model_vehicles.track(source=frame, conf=0.5, classes=[2, 3, 5, 7], persist=True)[0]
     boxes_data = results_vehicles.boxes.data.int().tolist()
 
     # loop over new tracked vehicles
@@ -51,18 +53,13 @@ while True:
                     lp_x1, lp_y1, lp_x2, lp_y2 = lp_box[0][:4]
                     lp = car[lp_y1: lp_y2, lp_x1: lp_x2]
 
-                    try:
-                        result, score = ocr.ocr(lp, rec=True)[0][0][1]
-                    except:
-                        pass
-                    else:
-                        if score >= 0.9:
-                            tracked_vehicles_ids.append(vehicle_id)
-                            results.append([car, result])
+                    full_lp_num = read_valid_license_plate(ocr, lp)
+                    if full_lp_num:
+                        tracked_vehicles_ids.append(vehicle_id)
+                        results.append([car, full_lp_num])
 
     # Save every 10 detected vehicles together using different thread to optimize performance
-    if len(tracked_vehicles_ids) % 10 == 0:
-        save_cars(results)
+    if results and len(tracked_vehicles_ids) % 10 == 0:
         temp_results = results.copy()
         thread = Thread(target=save_cars, args=(temp_results,))
         thread.start()
@@ -71,7 +68,8 @@ while True:
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
 
-if thread.is_alive():
+save_cars(results)
+if thread is not None and thread.is_alive():
     thread.join()
 
 cap.release()

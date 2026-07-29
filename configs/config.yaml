@@ -1,0 +1,53 @@
+# Deployment-layer configuration.
+#
+# This is a scaffold for a not-yet-built multi-stream deployment on top of the
+# existing main.py / utils.py pipeline. No values here have been validated on
+# real hardware or real cameras. Fill in stream URLs and paths for your setup;
+# do not commit real camera credentials or IPs (use env var substitution below
+# or a local .env, both gitignored).
+
+streams:
+  # Each entry is fed straight to cv2.VideoCapture. Use rtsp:// URLs for real
+  # cameras, a file path for local testing, or an integer string for a webcam.
+  - id: cam1
+    source: "videos/tc.mp4"
+  - id: cam2
+    source: "videos/tc.mp4"
+  - id: cam3
+    source: "videos/tc.mp4"
+  - id: cam4
+    source: "videos/tc.mp4"
+
+models:
+  vehicle_weights: "models/yolov8s.pt"
+  vehicle_engine: "models/yolov8s.engine"   # produced by src/export/export_tensorrt.py; not present until built on target device
+  plate_weights: "models/best.pt"
+  use_engine: false                          # true only once vehicle_engine actually exists for this device
+
+detection:
+  vehicle_conf: 0.5
+  vehicle_classes: [2, 3, 5, 7]   # COCO: car, motorcycle, bus, truck
+  inference_size: 640
+
+streaming:
+  frame_skip: 0            # 0 = process every frame; N = keep 1 of every (N+1) frames
+  reconnect_initial_backoff_s: 1.0
+  reconnect_max_backoff_s: 30.0
+  reconnect_max_retries: 0  # 0 = retry forever
+
+tracking:
+  algorithm: sort
+  max_age: 15               # frames a track survives with no matching detection
+  min_hits: 3                # consecutive matches required before a track is confirmed
+  iou_threshold: 0.3
+
+ocr:
+  gate_confidence: 0.95      # accept-and-cache threshold; below this, keep retrying OCR next frames
+  min_line_score: 0.9        # per-line PaddleOCR score floor, same as utils.read_valid_license_plate
+
+plate_rules_file: "configs/plate_rules.yaml"
+
+output:
+  video_dir: "output/deployment/video"
+  events_path: "output/deployment/events.jsonl"
+  annotate_video: true

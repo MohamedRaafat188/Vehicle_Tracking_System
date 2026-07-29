@@ -1,0 +1,31 @@
+# Vehicle Tracking System - Python 3.12
+#
+# torch and paddlepaddle are NOT listed here because they need custom index URLs.
+# Install them first, in this order (see README / setup steps):
+#
+#   pip install torch torchvision --index-url https://download.pytorch.org/whl/cu126
+#   pip install paddlepaddle==3.1.1
+#
+# Then: pip install -r requirements.txt
+
+# Vehicle + license plate detection / tracking
+ultralytics>=8.3,<9.0
+
+# License plate OCR. 3.x is REQUIRED: the code uses ocr.predict() and
+# res.json['res']['rec_texts'], which do not exist in paddleocr 2.x.
+paddleocr>=3.0,<4.0
+
+# CSV reporting and the daily traffic graph (utils.py)
+pandas>=2.0
+matplotlib>=3.8
+
+# Dataset download for training only (file.ipynb) - not needed to run main.py
+roboflow>=1.1
+
+# Deployment-layer scaffold (src/, benchmarks/, tests/): SORT tracker's
+# Hungarian assignment, config file parsing, RSS measurement, and the test suite.
+# Not needed to run main.py / visualize.py.
+scipy>=1.11
+pyyaml>=6.0
+psutil>=5.9
+pytest>=8.0

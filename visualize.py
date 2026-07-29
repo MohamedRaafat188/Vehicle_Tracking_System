@@ -2,14 +2,20 @@ from ultralytics import YOLO
 import cv2
 from time import time
 from paddleocr import PaddleOCR
+from utils import read_valid_license_plate
 
 
 # Initializing the models
-model_vehicles = YOLO("models/yolov8s")
+model_vehicles = YOLO("models/yolov8s.pt")
 model_lp = YOLO("models/best.pt")
 
 # Initialize ocr model
-ocr = PaddleOCR(lang='en', use_gpu=True)
+ocr = PaddleOCR(
+    lang="en",
+    ocr_version="PP-OCRv4",
+    use_doc_orientation_classify=False,
+    use_doc_unwarping=False,
+    use_textline_orientation=False)
 
 # Input and output videos
 video_path = input("Enter video path: ")
@@ -34,7 +40,7 @@ while True:
     frame = cv2.resize(frame, (1920, 1080))
 
     # Detecting vehicles and license plates
-    results_vehicles = model_vehicles.track(source=frame, conf=0.7, classes=[2, 3, 5, 7], persist=True)[0]
+    results_vehicles = model_vehicles.track(source=frame, conf=0.5, classes=[2, 3, 5, 7], persist=True)[0]
     results_lps = model_lp(source=frame, device="gpu")[0]
 
     vehicles_boxes = results_vehicles.boxes.data.int().tolist()
@@ -49,13 +55,9 @@ while True:
         x1, y1, x2, y2 = lp_box[:4]
         lp = frame[y1: y2, x1: x2]
 
-        try:
-            result, score = ocr.ocr(lp, rec=True)[0][0][1]
-        except:
-            pass
-        else:
-            if score >= 0.9:
-                cv2.putText(frame, result, (x1, y1-20), cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 255, 0), 3)
+        lp_num = read_valid_license_plate(ocr, lp)
+        if lp_num:
+            cv2.putText(frame, lp_num, (x1, y1-20), cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 255, 0), 3)
         cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 3)
 
     out.write(frame)
