@@ -1,7 +1,7 @@
 """Deployment-layer pipeline entry point.
 
 Wires: StreamManager (readers) -> YOLO vehicle detector (.pt or .engine) ->
-per-stream GatedOcrTracker (SORT + confidence-gated OCR) -> plate
+per-stream GatedOcrTracker (Ultralytics ByteTrack/BoT-SORT + gated OCR) -> plate
 post-processing -> output sinks (annotated video / JSONL events / stdout).
 
 Runs anywhere with --source pointing at a local video file, so it doesn't
@@ -89,7 +89,11 @@ class PipelineRunner:
         )
 
         det_cfg = config["detection"]
-        self.vehicle_conf = det_cfg["vehicle_conf"]
+        # Detect at a low floor and let the tracker's own track_high_thresh /
+        # track_low_thresh gate detections; ByteTrack's second association pass
+        # relies on seeing sub-vehicle_conf boxes, so pre-filtering at
+        # vehicle_conf here would throw away exactly what it recovers.
+        self.detect_conf = det_cfg.get("detect_conf", 0.1)
         self.vehicle_classes = det_cfg["vehicle_classes"]
 
         ocr_cfg = config["ocr"]
@@ -101,9 +105,9 @@ class PipelineRunner:
             s["id"]: GatedOcrTracker(
                 ocr_fn=self._ocr_fn,
                 gate_confidence=ocr_cfg["gate_confidence"],
-                max_age=tracking_cfg["max_age"],
-                min_hits=tracking_cfg["min_hits"],
-                iou_threshold=tracking_cfg["iou_threshold"],
+                tracker_type=tracking_cfg["tracker_type"],
+                frame_rate=tracking_cfg.get("frame_rate", 30),
+                overrides=tracking_cfg.get("overrides"),
             )
             for s in streams_cfg
         }
@@ -182,17 +186,18 @@ class PipelineRunner:
     def _process_frame(self, stream_id: str, frame: np.ndarray) -> None:
         frame = cv2.resize(frame, (1920, 1080))
         results = self.model_vehicles.predict(
-            source=frame, conf=self.vehicle_conf, classes=self.vehicle_classes, verbose=False,
+            source=frame, conf=self.detect_conf, classes=self.vehicle_classes, verbose=False,
         )[0]
         boxes_data = results.boxes.data.tolist()
         if not boxes_data:
             return
 
         boxes = np.array([b[:4] for b in boxes_data])
+        scores = np.array([b[4] for b in boxes_data])
         classes = np.array([int(b[5]) for b in boxes_data])
 
         tracker = self._trackers[stream_id]
-        tracks = tracker.update(boxes, classes, frame)
+        tracks = tracker.update(boxes, scores, classes, frame)
 
         for state in tracks:
             if state.locked:

@@ -28,7 +28,7 @@ from ultralytics import YOLO
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from utils import read_valid_license_plate  # noqa: E402
-from src.inference.sort import Sort  # noqa: E402
+from src.inference.tracker import _Detections, _build_tracker  # noqa: E402
 
 try:
     import psutil
@@ -96,7 +96,7 @@ def benchmark_pipeline(source: str, frames_limit: int, gate_confidence: float) -
         use_doc_orientation_classify=False, use_doc_unwarping=False,
         use_textline_orientation=False,
     )
-    tracker = Sort()
+    tracker = _build_tracker("bytetrack.yaml", frame_rate=30, overrides=None)
 
     stage_times = {"decode": [], "detect": [], "track": [], "ocr": [], "postprocess": []}
     ocr_calls, ocr_skipped = 0, 0
@@ -115,23 +115,27 @@ def benchmark_pipeline(source: str, frames_limit: int, gate_confidence: float) -
         frame = cv2.resize(frame, (1920, 1080))
 
         t0 = time.perf_counter()
-        results = model_vehicles.predict(source=frame, conf=0.5, classes=[2, 3, 5, 7], verbose=False)[0]
+        # Detect at a low floor; the tracker's thresholds gate (matches src/pipeline.py).
+        results = model_vehicles.predict(source=frame, conf=0.1, classes=[2, 3, 5, 7], verbose=False)[0]
         boxes_data = results.boxes.data.tolist()
         stage_times["detect"].append(time.perf_counter() - t0)
 
         boxes = np.array([b[:4] for b in boxes_data]) if boxes_data else np.empty((0, 4))
+        scores = np.array([b[4] for b in boxes_data]) if boxes_data else np.empty((0,))
         classes = np.array([int(b[5]) for b in boxes_data]) if boxes_data else np.empty((0,))
 
         t0 = time.perf_counter()
-        tracks = tracker.update(boxes, classes)
+        # rows: [x1, y1, x2, y2, track_id, score, cls, det_idx]
+        tracks = tracker.update(_Detections(boxes, scores, classes), frame)
         stage_times["track"].append(time.perf_counter() - t0)
 
         t0 = time.perf_counter()
-        for t in tracks:
-            if t["id"] in locked_ids:
+        for row in tracks:
+            track_id = int(row[4])
+            if track_id in locked_ids:
                 ocr_skipped += 1
                 continue
-            x1, y1, x2, y2 = t["bbox"].astype(int)
+            x1, y1, x2, y2 = np.asarray(row[:4]).astype(int)
             car = frame[max(y1, 0):y2, max(x1, 0):x2]
             if car.size == 0:
                 continue
@@ -144,7 +148,7 @@ def benchmark_pipeline(source: str, frames_limit: int, gate_confidence: float) -
             ocr_calls += 1
             plate = read_valid_license_plate(ocr, lp_crop)
             if plate:
-                locked_ids.add(t["id"])
+                locked_ids.add(track_id)
         stage_times["ocr"].append(time.perf_counter() - t0)
         stage_times["postprocess"].append(0.0)  # plate_postprocess.py is a pure-CPU string op, negligible
 

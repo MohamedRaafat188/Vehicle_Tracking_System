@@ -60,7 +60,7 @@ src/streaming/stream_manager.py - round-robins frames across streams
         |
 YOLOv8 vehicle detector (.pt, or a TensorRT .engine once one is built)
         |
-src/inference/tracker.py       - SORT + confidence-gated OCR
+src/inference/tracker.py       - Ultralytics ByteTrack/BoT-SORT + gated OCR
         |
 PaddleOCR (gated: only called until a track's read clears the threshold)
         |
@@ -117,8 +117,16 @@ been run yet, and no number in this repo is invented. Run it yourself and
 
 ### Engineering decisions
 
-- **SORT, not DeepSORT/BoT-SORT:** no spare compute for a re-ID network on a
-  device where OCR is meant to be the bottleneck, not detection.
+- **Ultralytics ByteTrack (default), not a hand-rolled SORT:** tracking is
+  delegated to Ultralytics' own trackers (`tracking.tracker_type` in
+  `configs/config.yaml`) rather than reimplemented. ByteTrack is the default:
+  motion-only association with no re-ID network, so OCR stays the bottleneck
+  rather than detection, but its second association pass recovers the
+  low-confidence / short-occlusion detections a plain SORT drops. BoT-SORT
+  (`tracker_type: botsort.yaml`, optionally `with_reid: true`) is selectable
+  for occlusion-heavy scenes where recovering an ID across occlusion is worth
+  the extra compute. Detection runs at a low `detect_conf` floor so the
+  tracker's own `track_high_thresh` / `track_low_thresh` do the gating.
 - **OCR gated per track ID, not run every frame:** once a track's read clears
   `ocr.gate_confidence`, it's cached and skipped thereafter — this is the
   actual point of `tracker.py`, since OCR (not detection) is assumed to be
@@ -141,8 +149,9 @@ been run yet, and no number in this repo is invented. Run it yourself and
 
 ### Limitations
 
-- SORT has no re-ID/appearance model, so it can lose a track through
-  occlusion and never recover the same ID.
+- ByteTrack (the default) has no re-ID/appearance model, so it can lose a
+  track through a long occlusion and never recover the same ID; switch to
+  BoT-SORT with `with_reid: true` for that case, at extra compute cost.
 - A track's plate is whatever single OCR read first cleared the gate
   threshold — there's no voting across reads, so a confident misread
   persists for that track's whole lifetime.

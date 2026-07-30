@@ -25,7 +25,10 @@ models:
   use_engine: false                          # true only once vehicle_engine actually exists for this device
 
 detection:
-  vehicle_conf: 0.5
+  # Low floor: the tracker's track_high_thresh / new_track_thresh do the real
+  # gating (see tracking:), and ByteTrack's low-score second-association pass
+  # needs to see sub-threshold boxes. Raise only if detection is too noisy.
+  detect_conf: 0.1
   vehicle_classes: [2, 3, 5, 7]   # COCO: car, motorcycle, bus, truck
   inference_size: 640
 
@@ -36,10 +39,20 @@ streaming:
   reconnect_max_retries: 0  # 0 = retry forever
 
 tracking:
-  algorithm: sort
-  max_age: 15               # frames a track survives with no matching detection
-  min_hits: 3                # consecutive matches required before a track is confirmed
-  iou_threshold: 0.3
+  # Ultralytics' own trackers. "bytetrack.yaml" = motion-only association, no
+  # re-ID network (keeps OCR the bottleneck, not detection). Switch to
+  # "botsort.yaml" for occlusion-heavy scenes where recovering a vehicle's ID
+  # across occlusion is worth the extra compute (set with_reid: true in
+  # overrides for appearance re-ID).
+  tracker_type: bytetrack.yaml
+  frame_rate: 30            # source fps; scales track_buffer -> max frames a track survives lost
+  # Optional overrides merged onto the shipped tracker yaml. Defaults shown.
+  overrides:
+    track_high_thresh: 0.25   # >= this: first (high-confidence) association pass
+    track_low_thresh: 0.1     # between low and high: second association pass (ByteTrack's edge)
+    new_track_thresh: 0.25    # min score to spawn a brand-new track
+    track_buffer: 30          # frames a lost track is kept for re-association (was max_age)
+    match_thresh: 0.8         # IoU match threshold for association
 
 ocr:
   gate_confidence: 0.95      # accept-and-cache threshold; below this, keep retrying OCR next frames
